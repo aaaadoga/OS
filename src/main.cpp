@@ -28,11 +28,11 @@ int run();
 int findpath(char *topath);
 void help();
 int mkdir();
-int create();
+int touch();
 int read();
 int write();
-int del();
 int rm();
+int rmdir();
 int cd();
 int ls();
 filenode *root, *recent, *temp, *ttemp, *temp_child;
@@ -62,11 +62,11 @@ void createroot() {
 
 void help() {
   cout << endl;
-  cout << "create:             建立文件。                " << endl;
+  cout << "touch:             建立文件。                " << endl;
   cout << "read:               读取文件。                  " << endl;
   cout << "write:              写入文件。                 " << endl;
-  cout << "delete:             删除文件。                  " << endl;
-  cout << "rm:                 删除目录。                  " << endl;
+  cout << "rm:             删除文件。                  " << endl;
+  cout << "rmdir:                 删除目录。                  " << endl;
   cout << "mkdir:              建立目录。                " << endl;
   cout << "cd:                 切换目录。                  " << endl;
   cout << "ls:                显示目录。                  " << endl;
@@ -155,7 +155,7 @@ int write() {
   }
 }
 
-int del() {
+int rm() {
   char filename[FILENAME_LENGTH];
   cin >> filename;
   temp = new filenode;
@@ -189,7 +189,7 @@ int del() {
   return 0;
 }
 
-int rm() {
+int rmdir() {
   char filename[FILENAME_LENGTH];
   cin >> filename;
   temp = new filenode;
@@ -366,7 +366,7 @@ int mkdir() {
   return 0;
 }
 
-int create() {
+int touch() {
   temp = initnode(" ", 0);
   cin >> temp->filename;
   if (recent->child == NULL) {
@@ -409,16 +409,16 @@ int run() {
     ls();
   else if (strcmp(command, "cd") == 0)
     cd();
-  else if (strcmp(command, "create") == 0)
-    create();
+  else if (strcmp(command, "touch") == 0)
+    touch();
   else if (strcmp(command, "read") == 0)
     read();
-  else if (strcmp(command, "rm") == 0)
-    rm();
+  else if (strcmp(command, "rmdir") == 0)
+    rmdir();
   else if (strcmp(command, "write") == 0)
     write();
-  else if (strcmp(command, "delete") == 0)
-    del();
+  else if (strcmp(command, "rm") == 0)
+    rm();
   else if (strcmp(command, "help") == 0)
     help();
   else if (strcmp(command, "logout") == 0)
