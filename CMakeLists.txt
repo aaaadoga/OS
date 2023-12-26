@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.10)
+project(OS)
+add_compile_options(--std=c++20)
+file(GLOB_RECURSE SOURCES "src/*.cpp")
+add_executable(OS ${SOURCES})
+target_include_directories(OS PRIVATE "./include" )
