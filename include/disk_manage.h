@@ -15,8 +15,9 @@ struct FCB{
     char filename[10];
     uint16_t size;
     uint16_t addr[13];
-
 };
+
+
 extern uint64_t BITMAP[16];
 
 struct Block{
