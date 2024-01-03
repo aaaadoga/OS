@@ -6,11 +6,9 @@ uint64_t BITMAP[16] = {0};
 FileBlock fileBlocks[1024];
 std::fstream file("disk.dat", std::ios::in | std::ios::out | std::ios::binary);
 
-int main()
-{
+int main() {
   // 判断文件是否存在
-  if (!file)
-  {
+  if (!file) {
     std::cout << "file not exist" << std::endl;
     // 创建文件
     file.open("disk.dat", std::ios::out | std::ios::binary);
@@ -27,8 +25,7 @@ int main()
   file.seekg(1024 * sizeof(FileBlock), std::ios::beg);
   file.read(reinterpret_cast<char *>(&BITMAP), sizeof(uint64_t));
 
-  if ((BITMAP[0] & 0x8000000000000000) == 0 || (root.mode & 0x8000) == 0)
-  {
+  if ((BITMAP[0] & 0x8000000000000000) == 0 || (root.mode & 0x8000) == 0) {
     std::cout << "disk error,formating" << std::endl;
     format();
     file.close();
@@ -38,8 +35,7 @@ int main()
   std::cout << "disk ok" << std::endl;
 }
 
-int format()
-{
+int format() {
   // 初始化位图
   memset(BITMAP, 0, 16 * sizeof(uint64_t));
   // 初始化Block
@@ -62,25 +58,20 @@ int format()
 }
 
 // addr为地址数组，长度为blockNum
-int getFreeBlock(uint16_t *addr, uint16_t blockNum)
-{
+int getFreeBlock(uint16_t *addr, uint16_t blockNum) {
 
   // 读取位图
   file.seekg(1024 * sizeof(FileBlock), std::ios::beg);
   file.read(reinterpret_cast<char *>(BITMAP), 16 * sizeof(uint64_t));
   // 遍历位图,找到空闲块并设置位图
-  for (int i = 0; i < 16; i++)
-  {
-    if (BITMAP[i] == 0xffffffffffffffff)
-    {
+  for (int i = 0; i < 16; i++) {
+    if (BITMAP[i] == 0xffffffffffffffff) {
       continue;
     }
-    for (int j = 0; blockNum && j < 64; j++)
-    {
+    for (int j = 0; blockNum && j < 64; j++) {
       if (i * 64 + j == 900)
         return -1;
-      if ((BITMAP[i] & (0x8000000000000000 >> j)) == 0)
-      {
+      if ((BITMAP[i] & (0x8000000000000000 >> j)) == 0) {
         BITMAP[i] |= (0x8000000000000000 >> j);
         addr[blockNum - 1] = i * 64 + j;
         blockNum--;
@@ -88,8 +79,7 @@ int getFreeBlock(uint16_t *addr, uint16_t blockNum)
     }
   }
   // 写入位图
-  if (blockNum == 0)
-  {
+  if (blockNum == 0) {
     file.seekp(1024 * sizeof(FileBlock), std::ios::beg);
     file.write(reinterpret_cast<char *>(BITMAP), 16 * sizeof(uint64_t));
     file.close();
@@ -100,16 +90,14 @@ int getFreeBlock(uint16_t *addr, uint16_t blockNum)
   return -1;
 }
 
-int deleteBlock(uint16_t *addr, uint16_t blockNum)
-{
+int deleteBlock(uint16_t *addr, uint16_t blockNum) {
 
   // 读取位图
   file.seekg(1024 * sizeof(FileBlock), std::ios::beg);
   file.read(reinterpret_cast<char *>(BITMAP), 16 * sizeof(uint64_t));
 
   // 遍历位图,找到非空闲块并设置位图
-  for (int i = 0; i < blockNum; i++)
-  {
+  for (int i = 0; i < blockNum; i++) {
     BITMAP[addr[i] / 64] &= ~(0x8000000000000000 >> (addr[i] % 64));
   }
   // 写入位图
@@ -120,10 +108,8 @@ int deleteBlock(uint16_t *addr, uint16_t blockNum)
   return 0;
 }
 
-int deleteInode(uint16_t dir_addr, uint16_t addr)
-{
-  if (addr == 0)
-  { // 根目录不可删除
+int deleteInode(uint16_t dir_addr, uint16_t addr) {
+  if (addr == 0) { // 根目录不可删除
     return -1;
   }
   // 读取父目录
@@ -139,10 +125,8 @@ int deleteInode(uint16_t dir_addr, uint16_t addr)
 
   dir_item temp = dir_block.data[dir.size % 4 - 1]; // 最后一个目录项
 
-  for (int i = 0; i < dir.size % 4; i++)
-  { // 最后一个目录块
-    if (dir_block.data[i].addr == addr)
-    {
+  for (int i = 0; i < dir.size % 4; i++) { // 最后一个目录块
+    if (dir_block.data[i].addr == addr) {
       dir_block.data[i] = temp; // 覆盖
       dir.size--;
       // 写入父目录块文件
@@ -153,16 +137,13 @@ int deleteInode(uint16_t dir_addr, uint16_t addr)
     }
   }
 
-  for (int i = 0; i < (dir.size - 1) / 4; i++)
-  { // 其他目录块
+  for (int i = 0; i < (dir.size - 1) / 4; i++) { // 其他目录块
     // 读取目录块
     file.seekg(dir.addr[i] * sizeof(FileBlock), std::ios::beg);
     file.read(reinterpret_cast<char *>(&dir_block), sizeof(DirBlock));
 
-    for (int j = 0; j < 4; j++)
-    { // 遍历目录项
-      if (dir_block.data[j].addr == addr)
-      {
+    for (int j = 0; j < 4; j++) { // 遍历目录项
+      if (dir_block.data[j].addr == addr) {
         dir_block.data[j] = temp; // 覆盖
         dir.size--;
         // 写入父目录块文件
@@ -190,9 +171,7 @@ int deleteInode(uint16_t dir_addr, uint16_t addr)
     addr_list[(file_node.size - 1) / 40 + 1] = addr;
     // 删除文件块
     deleteBlock(addr_list, (file_node.size - 1) / 40 + 1 + 1);
-  }
-  else
-  {
+  } else {
     deleteBlock(&addr, 1);
   }
 
@@ -200,8 +179,7 @@ int deleteInode(uint16_t dir_addr, uint16_t addr)
 }
 
 int createFile(uint16_t dir_addr, const char *name, uint16_t *file_addr,
-               char *buffer, int size)
-{
+               char *buffer, int size) {
   // dir_addr为父目录地址，name为文件名，file_addr为文件地址，buffer为文件内容，size为文件大小
 
   // 申请空闲块
@@ -217,8 +195,7 @@ int createFile(uint16_t dir_addr, const char *name, uint16_t *file_addr,
   file.seekp(addr[0] * sizeof(FileBlock), std::ios::beg);
   file.write(reinterpret_cast<char *>(&file_node), sizeof(FileBlock));
 
-  for (int i = 1; i < (size - 1) / 40 + 1 + 1; i++)
-  { // 写入文件内容
+  for (int i = 1; i < (size - 1) / 40 + 1 + 1; i++) { // 写入文件内容
     file.seekp(addr[i] * sizeof(FileBlock), std::ios::beg);
     file.write(buffer + (i - 1) * 40, sizeof(FileBlock));
   }
@@ -229,12 +206,9 @@ int createFile(uint16_t dir_addr, const char *name, uint16_t *file_addr,
   file.read(reinterpret_cast<char *>(&dir), sizeof(FileBlock));
   DirBlock dir_block;
   // 写入目录项
-  if (dir.size % 4 == 0)
-  {
+  if (dir.size % 4 == 0) {
     getFreeBlock(&dir.addr[dir.size / 4], 1);
-  }
-  else
-  {
+  } else {
     file.seekg(dir.addr[dir.size / 4] * sizeof(FileBlock), std::ios::beg);
     file.read(reinterpret_cast<char *>(&dir_block), sizeof(DirBlock));
   }
@@ -251,8 +225,7 @@ int createFile(uint16_t dir_addr, const char *name, uint16_t *file_addr,
   return 0;
 }
 
-int createDir(uint16_t dir_addr, char *name, uint16_t *child_dir_addr)
-{
+int createDir(uint16_t dir_addr, char *name, uint16_t *child_dir_addr) {
 
   // 申请空闲块
   uint16_t addr;
@@ -272,12 +245,9 @@ int createDir(uint16_t dir_addr, char *name, uint16_t *child_dir_addr)
   file.read(reinterpret_cast<char *>(&dir), sizeof(FileBlock));
   DirBlock dir_block;
   // 写入目录项
-  if (dir.size % 4 == 0)
-  {
+  if (dir.size % 4 == 0) {
     getFreeBlock(&dir.addr[dir.size / 4], 1);
-  }
-  else
-  {
+  } else {
     file.seekg(dir.addr[dir.size / 4] * sizeof(FileBlock), std::ios::beg);
     file.read(reinterpret_cast<char *>(&dir_block), sizeof(DirBlock));
   }
@@ -294,15 +264,13 @@ int createDir(uint16_t dir_addr, char *name, uint16_t *child_dir_addr)
   return 0;
 }
 
-int loadFile(uint16_t addr, char *buffer)
-{
+int loadFile(uint16_t addr, char *buffer) {
   // 读取文件inode
   file.seekg(addr * sizeof(FileBlock), std::ios::beg);
   inode file_node;
   file.read(reinterpret_cast<char *>(&file_node), sizeof(FileBlock));
 
-  for (int i = 0; i < (file_node.size - 1) / 40 + 1; i++)
-  { // 读取文件内容
+  for (int i = 0; i < (file_node.size - 1) / 40 + 1; i++) { // 读取文件内容
     file.seekg(file_node.addr[i] * sizeof(FileBlock), std::ios::beg);
     file.read(buffer + i * 40, sizeof(FileBlock));
   }
@@ -310,8 +278,7 @@ int loadFile(uint16_t addr, char *buffer)
   return 0;
 }
 
-int readDir(uint16_t addr, FCB *buffer, uint16_t *size)
-{
+int readDir(uint16_t addr, FCB *buffer, uint16_t *size) {
   // 读取目录inode
   file.seekg(addr * sizeof(FileBlock), std::ios::beg);
   inode dir;
@@ -326,8 +293,7 @@ int readDir(uint16_t addr, FCB *buffer, uint16_t *size)
   file.read(reinterpret_cast<char *>(&dir_block), sizeof(DirBlock));
 
   inode child_inode;
-  for (int i = 0; i < dir.size % 4; i++)
-  { // 最后一个目录块
+  for (int i = 0; i < dir.size % 4; i++) { // 最后一个目录块
     buffer[pointer].addr = dir_block.data[i].addr;
     memcpy(buffer[pointer].name, dir_block.data[i].name, 8);
     file.seekg(dir_block.data[i].addr * sizeof(FileBlock), std::ios::beg);
@@ -337,14 +303,12 @@ int readDir(uint16_t addr, FCB *buffer, uint16_t *size)
     pointer++;
   }
 
-  for (int i = 0; i < (dir.size - 1) / 4; i++)
-  { // 其他目录块
+  for (int i = 0; i < (dir.size - 1) / 4; i++) { // 其他目录块
     // 读取目录块
     file.seekg(dir.addr[i] * sizeof(FileBlock), std::ios::beg);
     file.read(reinterpret_cast<char *>(&dir_block), sizeof(DirBlock));
 
-    for (int j = 0; j < 4; j++)
-    { // 遍历目录项
+    for (int j = 0; j < 4; j++) { // 遍历目录项
       buffer[pointer].addr = dir_block.data[j].addr;
       memcpy(buffer[pointer].name, dir_block.data[j].name, 8);
       file.seekg(dir_block.data[j].addr * sizeof(FileBlock), std::ios::beg);
@@ -357,8 +321,8 @@ int readDir(uint16_t addr, FCB *buffer, uint16_t *size)
   return 0;
 }
 
-int swapBlock(uint16_t swap_addr,FileBlock * buffer){
-  swap_addr%=124;
-  file.seekp((swap_addr+900) * sizeof(FileBlock), std::ios::beg);
+int swapBlock(uint16_t swap_addr, FileBlock *buffer) {
+  swap_addr %= 124;
+  file.seekp((swap_addr + 900) * sizeof(FileBlock), std::ios::beg);
   file.write(reinterpret_cast<char *>(buffer), sizeof(FileBlock));
 }
