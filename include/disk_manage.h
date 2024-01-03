@@ -51,9 +51,8 @@ int deleteInode(uint16_t dir_addr, uint16_t addr); // 删除inode///
 
 int loadFile(uint16_t addr, char *buffer); //
 
-int readFile(uint16_t addr, char *buffer, int *size); //
 
-int readDir(uint16_t addr, FCB *buffer, int *size); //
+int readDir(uint16_t addr, FCB *buffer, uint16_t *size); //
 
 extern uint64_t BITMAP[16];
 

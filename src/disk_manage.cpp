@@ -34,10 +34,10 @@ int main() {
   // 检查完毕
   std::cout << "disk ok" << std::endl;
 
-  uint16_t addr = 0;
-  getFreeBlock(&addr, 1);
-  // deleteFileBlock(19);
-  std::cout << addr << std::endl;
+
+
+
+ 
 }
 
 int format() {
@@ -156,18 +156,27 @@ int deleteInode(uint16_t dir_addr, uint16_t addr) {
       }
     }
   }
+  // 写入父目录inode
+  file.seekp(dir_addr * sizeof(FileBlock), std::ios::beg);
+  file.write(reinterpret_cast<char *>(&dir), sizeof(FileBlock));
+
   // 文件删除，读入文件inode
   file.seekg(addr * sizeof(FileBlock), std::ios::beg);
   inode file_node;
   file.read(reinterpret_cast<char *>(&file_node), sizeof(FileBlock));
 
+  if (file_node.size)
   // 将文件块装入addr_list
-  uint16_t addr_list[(file_node.size - 1) / 40 + 1 + 1];
-  memcpy(addr_list, file_node.addr,
-         sizeof(uint16_t) * (file_node.size - 1) / 40 + 1);
-  addr_list[(file_node.size - 1) / 40 + 1] = addr;
-  // 删除文件块
-  deleteBlock(addr_list, (file_node.size - 1) / 40 + 1 + 1);
+  {
+    uint16_t addr_list[(file_node.size - 1) / 40 + 1 + 1];
+    memcpy(addr_list, file_node.addr,
+           sizeof(uint16_t) * ((file_node.size - 1) / 40 + 1));
+    addr_list[(file_node.size - 1) / 40 + 1] = addr;
+    // 删除文件块
+    deleteBlock(addr_list, (file_node.size - 1) / 40 + 1 + 1);
+  } else {
+    deleteBlock(&addr, 1);
+  }
 
   return 0;
 }
@@ -185,7 +194,7 @@ int createFile(uint16_t dir_addr, const char *name, uint16_t *file_addr,
   inode file_node;
   file_node.mode = 0x0000;
   file_node.size = size;
-  memcpy(file_node.addr, addr + 1, sizeof(uint16_t) * (size - 1) / 40 + 1);
+  memcpy(file_node.addr, addr + 1, sizeof(uint16_t) * ((size - 1) / 40 + 1));
   file.seekp(addr[0] * sizeof(FileBlock), std::ios::beg);
   file.write(reinterpret_cast<char *>(&file_node), sizeof(FileBlock));
 
@@ -272,9 +281,7 @@ int loadFile(uint16_t addr, char *buffer) {
   return 0;
 }
 
-int readFile(uint16_t addr, char *buffer, int *size) { return 0; }
-
-int readDir(uint16_t addr, FCB *buffer, int *size) {
+int readDir(uint16_t addr, FCB *buffer, uint16_t *size) {
   // 读取目录inode
   file.seekg(addr * sizeof(FileBlock), std::ios::beg);
   inode dir;
