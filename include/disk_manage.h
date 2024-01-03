@@ -45,7 +45,7 @@ int createDir(uint16_t dir_addr, char *name, uint16_t *child_dir_addr); //
 int getFreeBlock(uint16_t *addr,
                  uint16_t blockNum); // addr为地址数组，长度为blockNum///
 
-int deleteBlock(uint16_t addr); // 删除block///
+int deleteBlock(uint16_t *addr,uint16_t blockNum); // 删除block///
 
 int deleteInode(uint16_t dir_addr, uint16_t addr); // 删除inode///
 
@@ -53,6 +53,8 @@ int loadFile(uint16_t addr, char *buffer); //
 
 
 int readDir(uint16_t addr, FCB *buffer, uint16_t *size); //
+
+int swapBlock(uint16_t addr,FileBlock * buffer);
 
 extern uint64_t BITMAP[16];
 
