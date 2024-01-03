@@ -1,7 +1,6 @@
-#include <DiskManage.h>
-#include <FileSystem.h>
-#include <MemoryManage.h>
-#include <ProcessManage.h>
+#include <disk_manage.h>
+#include <file_system.h>
+#include <memory_manage.h>
 
 #include <iostream>
 #include <stdio.h>
@@ -447,6 +446,6 @@ int main() {
 //       break;
 //   }
 //   return 0;
-bool a;
-cout<<sizeof(a);
+DirBlock a;
+cout<<0x8000;
 }
