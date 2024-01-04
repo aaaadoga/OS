@@ -1,13 +1,5 @@
 #include <cstdint>
 #include <fstream>
-class DiskManage {
-public:
-  DiskManage();
-  ~DiskManage();
-  void init();
-  void read(int blockNum, char *buffer);
-  void write(int blockNum, char *buffer);
-};
 
 struct FCB {
   uint16_t mode;
@@ -56,6 +48,6 @@ int readDir(uint16_t addr, FCB *buffer, uint16_t *size); //
 
 int swapBlock(uint16_t addr,FileBlock * buffer);
 
-extern uint64_t BITMAP[16];
+extern uint64_t _BITMAP[16];
 
 extern FileBlock fileBlocks[1024];

@@ -3,7 +3,7 @@
 #include <conio.h>
 #include <tchar.h>
 
-#define BUFSIZE 512
+#define BUFSIZE 1024
  
 int _tmain(int argc, TCHAR *argv[]) 
 { 
