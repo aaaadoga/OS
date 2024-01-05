@@ -12,7 +12,7 @@ int _tmain(int argc, TCHAR *argv[])
    TCHAR  chBuf[BUFSIZE]; 
    BOOL   fSuccess = FALSE; 
    DWORD  cbRead, cbToWrite, cbWritten, dwMode; 
-   LPTSTR lpszPipename = TEXT("\\\\.\\pipe\\mynamedpipe"); 
+   LPTSTR lpszPipename = TEXT("\\\\.\\pipe\\disk_manage_pipe"); 
 
    if( argc > 1 )
       lpvMessage = argv[1];

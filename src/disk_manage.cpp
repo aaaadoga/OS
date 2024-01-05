@@ -1,8 +1,8 @@
 #include <cstring>
 #include <disk_manage.h>
 #include <iostream>
-#include <inter_process.h>
 DWORD WINAPI InstanceThread(LPVOID lpvParam);
+int client(LPTSTR pipe_name, uint8_t *req, DWORD req_size, uint8_t *res, DWORD *res_size,bool ret);
 
 VOID GetAnswerToRequest(uint8_t *pchRequest, DWORD cbBytesRead,
                         uint8_t *pchReply,
@@ -42,6 +42,11 @@ int main()
   }
   // 检查完毕
   std::cout << "disk ok" << std::endl;
+  ///////////////////////////////////////////
+
+  // uint16_t addr;
+  // char t[]="dajiahao yao ,woshi shuode daoli ";
+  // createFile(0,"hello",&addr,t,40);
 
   ////////////////////////////////////////////////////////////////////////////////////////////
   // 开启服务器
@@ -59,16 +64,16 @@ int main()
   {
     _tprintf(TEXT("\nDisk Manage Server: Main thread awaiting client connection on %s\n"), lpszPipename);
     hPipe = CreateNamedPipe(
-        lpszPipename,               // pipe name
-        PIPE_ACCESS_DUPLEX,         // read/write access
-        PIPE_TYPE_MESSAGE |         // message type pipe
-            PIPE_READMODE_MESSAGE | // message-read mode
-            PIPE_WAIT,              // blocking mode
-        PIPE_UNLIMITED_INSTANCES,   // max. instances
-        BUFSIZE,                    // output buffer size
-        BUFSIZE,                    // input buffer size
-        0,                          // client time-out
-        NULL);                      // default security attribute
+        lpszPipename,             // pipe name
+        PIPE_ACCESS_DUPLEX,       // read/write access
+        PIPE_TYPE_BYTE |          // message type pipe
+            PIPE_READMODE_BYTE |  // message-read mode
+            PIPE_WAIT,            // blocking mode
+        PIPE_UNLIMITED_INSTANCES, // max. instances
+        BUFSIZE,                  // output buffer size
+        BUFSIZE,                  // input buffer size
+        0,                        // client time-out
+        NULL);                    // default security attribute
 
     if (hPipe == INVALID_HANDLE_VALUE)
     {
@@ -136,7 +141,7 @@ int format()
 // addr为地址数组，长度为blockNum
 int getFreeBlock(uint16_t *addr, uint16_t blockNum)
 {
-
+  char blank[40] = {0};
   // 读取位图
   file.seekg(1024 * sizeof(FileBlock), std::ios::beg);
   file.read(reinterpret_cast<char *>(_BITMAP), 16 * sizeof(uint64_t));
@@ -155,6 +160,8 @@ int getFreeBlock(uint16_t *addr, uint16_t blockNum)
       {
         _BITMAP[i] |= (0x8000000000000000 >> j);
         addr[blockNum - 1] = i * 64 + j;
+        file.seekp((i * 64 + j) * sizeof(FileBlock), std::ios::beg);
+        file.write(blank, 40);
         blockNum--;
       }
     }
@@ -330,6 +337,7 @@ int createDir(uint16_t dir_addr, char *name, uint16_t *child_dir_addr)
   uint16_t addr;
   getFreeBlock(&addr, 1);
   *child_dir_addr = addr; // 子目录inode地址
+  std::cout<<addr;
 
   // 写入子目录inode块
   inode dir_node;
@@ -382,7 +390,7 @@ int loadFile(uint16_t addr, char *buffer)
   return 0;
 }
 
-int readDir(uint16_t addr, FCB *buffer, uint16_t *size)
+int readDir(uint16_t addr, FCB_P *buffer, uint16_t *size)
 {
   // 读取目录inode
   file.seekg(addr * sizeof(FileBlock), std::ios::beg);
@@ -429,11 +437,27 @@ int readDir(uint16_t addr, FCB *buffer, uint16_t *size)
   return 0;
 }
 
-int swapBlock(uint16_t swap_addr, FileBlock *buffer)
+int readBlock(uint16_t addr, FileBlock *buffer)
 {
-  swap_addr %= 124;
-  file.seekp((swap_addr + 900) * sizeof(FileBlock), std::ios::beg);
-  file.write(reinterpret_cast<char *>(buffer), sizeof(FileBlock));
+  file.seekg((addr) * sizeof(FileBlock), std::ios::beg);
+  file.read(reinterpret_cast<char *>(buffer), sizeof(FileBlock));
+  return 0;
+}
+
+int loadToMemory(uint8_t index, uint16_t inode_addr)
+{
+  uint8_t req[1 + sizeof(MM_load_file)] = {0};
+  req[0] = MM_LOADFILE;
+  MM_load_file *p = (MM_load_file *)(req + 1);
+  p->index = index;
+  file.seekg((inode_addr) * sizeof(FileBlock), std::ios::beg);
+  inode file_node;
+  file.read(reinterpret_cast<char *>(&file_node), sizeof(FileBlock));
+  p->size = (file_node.size - 1) / 4 + 1;
+  memcpy(p->inode_addr, file_node.addr, p->size);
+  DWORD size;
+  client(MEMORY_MANAGE_PIPE, req, 1 + sizeof(MM_load_file), req, &size,false);
+  return 0;
 }
 
 DWORD WINAPI InstanceThread(LPVOID lpvParam)
@@ -517,9 +541,14 @@ DWORD WINAPI InstanceThread(LPVOID lpvParam)
     }
 
     // Process the incoming message.
-    GetAnswerToRequest((uint8_t*)pchRequest, cbBytesRead, (uint8_t*)pchReply, &cbReplyBytes);
+    GetAnswerToRequest((uint8_t *)pchRequest, cbBytesRead, (uint8_t *)pchReply, &cbReplyBytes);
 
     // Write the reply to the pipe.
+    if (cbReplyBytes == 0)
+    {
+      break;
+    }
+
     fSuccess = WriteFile(
         hPipe,        // handle to pipe
         pchReply,     // buffer to write from
@@ -546,6 +575,7 @@ DWORD WINAPI InstanceThread(LPVOID lpvParam)
   HeapFree(hHeap, 0, pchReply);
 
   printf("InstanceThread exiting.\n");
+  // show();
   return 1;
 }
 
@@ -558,30 +588,189 @@ VOID GetAnswerToRequest(uint8_t *pchRequest, DWORD cbBytesRead,
   {
     format();
   }
-  else if (*type == DM_CREATEFILE)
+  else if (*type == DM_CREATEFILE) // 创建文件
   {
     DM_createFile *p = (DM_createFile *)(pchRequest + 1); // 参数
-    uint16_t *reply = (uint16_t *)(pchReply);             // 返回值
-    createFile(p->dir_addr, p->name, reply, p->buffer, p->size);
+    createFile(p->dir_addr, p->name, (uint16_t *)pchReply, p->buffer, p->size);
+    std::cout << "createFile success\n";
     *pchBytes = 2;
-    return;
   }
-  else if (*type == DM_CREATEDIR)
+  else if (*type == DM_CREATEDIR) // 创建目录
   {
     DM_createDir *p = (DM_createDir *)(pchRequest + 1);
-    uint16_t *reply = (uint16_t *)(pchReply);
-    createDir(p->dir_addr, p->name, reply);
+    createDir(p->dir_addr, p->name, (uint16_t *)(pchReply));
+    std::cout << "createDir success\n";
     *pchBytes = 2;
   }
-  else if (*type == DM_DELETEINODE)
+  else if (*type == DM_DELETEINODE) // 删除目录或文件
   {
     DM_deleteInode *p = (DM_deleteInode *)(pchRequest + 1);
     deleteInode(p->dir_addr, p->addr);
+    std::cout << "deleteInode success\n";
     *pchBytes = 0;
   }
-  else if (*type == DM_LOADFILE)
+  else if (*type == DM_LOADFILE) // 读文件内容
   {
     DM_loadFile *p = (DM_loadFile *)(pchRequest + 1);
-    
+    loadFile(p->addr, (char *)pchReply);
+    std::cout << "loadFile success\n";
+    *pchBytes = 720;
   }
+  else if (*type == DM_READDIR) // 读目录
+  {
+    DM_readDir *p = (DM_readDir *)(pchRequest + 1);
+    uint16_t *size = (uint16_t *)(pchReply);         // 多少个目录项
+    readDir(p->addr, (FCB_P *)(pchReply + 2), size); //
+    std::cout << "readDir success\n";
+    *pchBytes = 2 + (*size) * sizeof(FCB_P);
+  }
+  else if (*type == DM_READBLOCK) // 内存用
+  {
+    DM_readBlock *p = (DM_readBlock *)(pchRequest + 1);
+    readBlock(p->addr, (FileBlock *)(pchReply));
+    std::cout << "readBlock success\n";
+    *pchBytes = 40;
+  }
+  else if (*type == DM_LOADTOMEMORY) // 载入内存
+  {
+    DM_loadToMemory *p = (DM_loadToMemory *)(pchRequest + 1);
+    loadToMemory(p->index, p->inode_addr);
+    std::cout << "loadToMemory success\n";
+    *pchBytes = 0;
+  }
+  else
+  {
+    *pchBytes = 0;
+  }
+}
+
+int client(LPTSTR pipe_name, uint8_t *req, DWORD req_size, uint8_t *res, DWORD *res_size,bool ret)
+{
+  HANDLE hPipe;
+  TCHAR chBuf[BUFSIZE];
+  BOOL fSuccess = FALSE;
+  DWORD cbRead, cbToWrite, cbWritten, dwMode;
+  LPTSTR lpszPipename = pipe_name;
+
+  // Try to open a named pipe; wait for it, if necessary.
+
+  while (1)
+  {
+    hPipe = CreateFile(
+        lpszPipename,  // pipe name
+        GENERIC_READ | // read and write access
+            GENERIC_WRITE,
+        0,             // no sharing
+        NULL,          // default security attributes
+        OPEN_EXISTING, // opens existing pipe
+        0,             // default attributes
+        NULL);         // no template file
+
+    // Break if the pipe handle is valid.
+
+    if (hPipe != INVALID_HANDLE_VALUE)
+      break;
+
+    // Exit if an error other than ERROR_PIPE_BUSY occurs.
+
+    if (GetLastError() != ERROR_PIPE_BUSY)
+    {
+      _tprintf(TEXT("Could not open pipe. GLE=%d\n"), GetLastError());
+      return -1;
+    }
+
+    // All pipe instances are busy, so wait for 20 seconds.
+
+    if (!WaitNamedPipe(lpszPipename, 20000))
+    {
+      printf("Could not open pipe: 20 second wait timed out.");
+      return -1;
+    }
+  }
+
+  // The pipe connected; change to message-read mode.
+
+  dwMode = PIPE_READMODE_BYTE;
+  fSuccess = SetNamedPipeHandleState(
+      hPipe,   // pipe handle
+      &dwMode, // new pipe mode
+      NULL,    // don't set maximum bytes
+      NULL);   // don't set maximum time
+  if (!fSuccess)
+  {
+    _tprintf(TEXT("SetNamedPipeHandleState failed. GLE=%d\n"), GetLastError());
+    return -1;
+  }
+
+  // Send a message to the pipe server.
+
+  cbToWrite = req_size;
+
+  fSuccess = WriteFile(
+      hPipe,      // pipe handle
+      req,        // message
+      cbToWrite,  // message length
+      &cbWritten, // bytes written
+      NULL);      // not overlapped
+
+  if (!fSuccess)
+  {
+    _tprintf(TEXT("WriteFile to pipe failed. GLE=%d\n"), GetLastError());
+    return -1;
+  }
+
+  // printf("\nMessage sent to server, receiving reply as follows:\n");
+  if(!ret){
+    return 0;
+  }
+
+  do
+  {
+    // Read from the pipe.
+    fSuccess = ReadFile(
+        hPipe,                   // pipe handle
+        res,                     // buffer to receive reply
+        BUFSIZE * sizeof(TCHAR), // size of buffer
+        res_size,                // number of bytes read
+        NULL);                   // not overlapped
+
+    if (!fSuccess && GetLastError() != ERROR_MORE_DATA)
+      break;
+
+    _tprintf(TEXT("\"%s\"\n"), chBuf);
+  } while (!fSuccess); // repeat loop if ERROR_MORE_DATA
+
+  if (!fSuccess)
+  {
+    _tprintf(TEXT("ReadFile from pipe failed. GLE=%d\n"), GetLastError());
+    return -1;
+  }
+
+  CloseHandle(hPipe);
+
+  return 0;
+}
+
+int show()
+{
+  std::cout << "courrent bitmap:\n";
+  for (int a = 0; a < 32; a++)
+  {
+    for (int b = 0; b < 32; b++)
+    {
+      int index = a * 32 + b;
+      int i = index / 64, j = index % 64;
+      if ((_BITMAP[i] & (0x8000000000000000 >> j)) == 0)
+      {
+        std::cout << "0";
+      }
+      else
+      {
+        std::cout << "1";
+      }
+    }
+    std::cout << "\n";
+  }
+  std::cout << "\n";
+  return 0;
 }

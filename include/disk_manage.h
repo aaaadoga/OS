@@ -1,12 +1,7 @@
 #include <cstdint>
 #include <fstream>
+#include <inter_process.h>
 
-struct FCB {
-  uint16_t mode;
-  uint16_t size;
-  char name[8];
-  uint16_t addr;
-};
 
 struct inode {
   uint16_t mode; // dir or file
@@ -41,13 +36,17 @@ int deleteBlock(uint16_t *addr,uint16_t blockNum); // 删除block///
 
 int deleteInode(uint16_t dir_addr, uint16_t addr); // 删除inode///
 
-int loadFile(uint16_t addr, char *buffer); //
+int loadFile(uint16_t addr, char *buffer); //读内容
 
 
-int readDir(uint16_t addr, FCB *buffer, uint16_t *size); //
+int readDir(uint16_t addr, FCB_P *buffer, uint16_t *size); //读目录
 
-int swapBlock(uint16_t addr,FileBlock * buffer);
+int readBlock(uint16_t addr,FileBlock * buffer);
+
+int loadToMemory(uint8_t index,uint16_t inode_addr);
 
 extern uint64_t _BITMAP[16];
 
 extern FileBlock fileBlocks[1024];
+
+int show();
